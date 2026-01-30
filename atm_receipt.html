@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATM Receipt Generator</title>
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 340px;
+        }
+
+        .input-group { margin-bottom: 15px; }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-family: sans-serif;
+            font-size: 14px;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .btn-main {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .btn-main:hover { background-color: #0056b3; }
+
+        #receipt {
+            display: none;
+            margin-top: 25px;
+            border-top: 2px dashed #333;
+            border-bottom: 2px dashed #333;
+            padding: 20px;
+            text-align: center;
+            background-color: #ffffa0;
+            color: black;
+        }
+
+        .receipt-header {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .receipt-line {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .thank-you {
+            margin-top: 15px;
+            font-style: italic;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+            font-family: sans-serif;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .email-status {
+            font-family: sans-serif;
+            font-size: 11px;
+            margin-top: 10px;
+            color: #555;
+            display: none;
+        }
+
+        .btn-print {
+            margin-top: 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-family: sans-serif;
+            font-weight: bold;
+        }
+        
+        .btn-print:hover { background-color: #218838; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #receipt, #receipt * { visibility: visible; }
+            #receipt {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                border: 2px dashed black;
+                background-color: white; 
+                display: block !important;
+            }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="atm-form">
+        <h2 style="font-family: sans-serif; text-align: center; margin-top: 0;">ATM Withdrawal</h2>
+        
+        <div class="input-group">
+            <label for="user-name">Account Holder Name</label>
+            <input type="text" id="user-name" placeholder="John Doe">
+        </div>
+
+        <div class="input-group">
+            <label for="amount">Withdrawal Amount (Rs.)</label>
+            <input type="number" id="amount" placeholder="e.g. 2000">
+        </div>
+
+        <div class="input-group">
+            <label for="pin">Enter 4-Digit PIN</label>
+            <input type="password" id="pin" maxlength="4" placeholder="****">
+        </div>
+        
+        <div class="input-group">
+            <label for="user-email">Email Address</label>
+            <input type="email" id="user-email" placeholder="john@example.com">
+        </div>
+
+        <button class="btn-main" onclick="generateReceipt()">Confirm Withdrawal</button>
+        <p id="error-msg" class="error"></p>
+    </div>
+
+    <div id="receipt">
+        <div class="receipt-header">Global Bank ATM</div>
+        <div style="font-size: 11px; margin-bottom: 15px;">Official Transaction Record</div>
+        
+        <div class="receipt-line">
+            <span>Date:</span>
+            <span id="r_date"></span>
+        </div>
+        <div class="receipt-line">
+            <span>Time:</span>
+            <span id="r-time"></span>
+        </div>
+        
+        <hr style="border: 0; border-top: 1px dashed #333; margin: 10px 0;">
+
+        <div class="receipt-line">
+            <span>Account:</span>
+            <span id="r-acc"></span>
+        </div>
+        
+        <br>
+
+        <div class="receipt-line">
+            <span>Prev Bal:</span>
+            <span id="r-main-bal"></span>
+        </div>
+        <div class="receipt-line" style="font-weight: bold;">
+            <span>Withdrawn:</span>
+            <span id="r_withdrawn"></span>
+        </div>
+        <div class="receipt-line" style="border-top: 1px solid #333; padding-top: 5px;">
+            <span>Current Bal:</span>
+            <span id="r-new-balance"></span>
+        </div>
+
+        <div class="thank-you">*** THANK YOU ***<br>COME AGAIN</div>
+        
+        <div id="email-status" class="email-status">Processing email...</div>
+
+        <button class="btn-print no-print" onclick="window.print()">Print Receipt</button>
+    </div>
+</div>
+
+<script>
+    
+    (function(){
+        emailjs.init("_Tr8JwfAHbmR4akeG"); 
+    })();
+
+    let currentBalance = 10000.00; 
+    const accountNumber = "4590123488996721"; 
+
+    function generateReceipt() {
+        const nameInput = document.getElementById('user-name').value;
+        const amountInput = document.getElementById('amount').value;
+        const pinInput = document.getElementById('pin').value;
+        const emailInput = document.getElementById('user-email').value; 
+        const errorMsg = document.getElementById('error-msg');
+        const receiptBox = document.getElementById('receipt');
+
+        // Validation
+        if (!nameInput || !amountInput || !pinInput || !emailInput) {
+            showError("All fields are required.");
+            return;
+        }
+        if (pinInput.length !== 4) {
+            showError("PIN must be 4 digits.");
+            return;
+        }
+        if(!emailInput.includes("@")) {
+            showError("Please enter a valid email.");
+            return;
+        }
+
+        const amount = parseFloat(amountInput);
+
+        if (amount > currentBalance) {
+            showError("Insufficient Funds.");
+            return;
+        }
+        if (amount <= 0) {
+            showError("Invalid Amount.");
+            return;
+        }
+
+        errorMsg.style.display = "none";
+
+        
+        const newBalance = currentBalance - amount;
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString();
+        const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const maskedAcc = "XXXX-XXXX-XXXX-" + accountNumber.slice(-4);
+
+        
+        document.getElementById('r_date').innerText = dateStr;
+        document.getElementById('r-time').innerText = timeStr;
+        document.getElementById('r-acc').innerText = maskedAcc;
+        document.getElementById('r-main-bal').innerText = "Rs." + currentBalance.toFixed(2);
+        document.getElementById('r_withdrawn').innerText = "Rs." + amount.toFixed(2);
+        document.getElementById('r-new-balance').innerText = "Rs." + newBalance.toFixed(2);
+
+        receiptBox.style.display = "block";
+
+        
+        sendEmailNotification(nameInput, emailInput, dateStr, timeStr, maskedAcc, amount, newBalance);
+    }
+
+    function showError(msg) {
+        const errorMsg = document.getElementById('error-msg');
+        const receiptBox = document.getElementById('receipt');
+        errorMsg.innerText = msg;
+        errorMsg.style.display = "block";
+        receiptBox.style.display = "none";
+    }
+
+    function sendEmailNotification(userName, userEmail, date, time, accNum, amount, newBal) {
+        const statusMsg = document.getElementById('email-status');
+        statusMsg.style.display = "block";
+        statusMsg.style.color = "#555";
+        statusMsg.innerText = "Sending confirmation email...";
+
+        
+        var templateParams = {
+            name: userName,
+            to_email: userEmail,
+            date: date,
+            time: time,
+            account_num: accNum,
+            amount: "Rs." + amount.toFixed(2),
+            new_balance: "Rs." + newBal.toFixed(2)
+        };
+
+        emailjs.send('service_o7xqblu', 'template_qbeqh2r', templateParams)
+            .then(function(response) {
+                statusMsg.innerText = "Confirmation email sent!";
+                statusMsg.style.color = "green";
+            }, function(error) {
+                statusMsg.innerText = "Email failed to send.";
+                statusMsg.style.color = "red";
+            });
+    }
+</script>
+
+</body>
+</html>
